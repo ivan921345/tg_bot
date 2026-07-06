@@ -21,8 +21,9 @@ user_menu = ReplyKeyboardMarkup(
 @router.message(F.text == "/start")
 async def start_handler(message: Message):
 
-    if( get_user_by_tg_id(message.from_user.id) == -1):
-        add_user(message.from_user.id, False)
+    print(message.from_user.username, message.from_user.full_name)
+    if(get_user_by_tg_id(message.from_user.id) == -1):
+        add_user(message.from_user.id, message.from_user.username, message.from_user.full_name)
     
     await message.answer(
         "🎮 Вітаємо у грі!\n\nОберіть потрібну дію:",

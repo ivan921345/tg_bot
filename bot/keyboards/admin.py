@@ -11,6 +11,7 @@ import os
 from dotenv import load_dotenv
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from services.users import get_admin_ids, get_all_user_ids, get_all_users
 
 load_dotenv()
 
@@ -45,7 +46,7 @@ admin_menu = ReplyKeyboardMarkup(
 
 
 def is_admin(user_id: int) -> bool:
-    return str(user_id) in ADMIN_IDS
+    return user_id in get_admin_ids()
 
 
 def report_check_keyboard(report_id: int):
@@ -99,19 +100,6 @@ async def admin_start_handler(message: Message):
     await message.answer(
         "👑 Панель адміністратора\n\nОберіть потрібну дію:",
         reply_markup=admin_menu,
-    )
-
-
-# ВРЕМЕННАЯ регистрация пользователя
-# Потом это нужно будет перенести в обычный /start handler и базу данных
-@router.message(F.text == "/start")
-async def start_handler(message: Message):
-    USERS.add(message.from_user.id)
-    print(message.from_user.id)
-
-    await message.answer(
-        "🧵 Вітаю у боті!\n\n"
-        "Ви зареєстровані як учасник гри."
     )
 
 
@@ -204,8 +192,10 @@ async def task_create_confirm_handler(
         await callback.answer("Дані завдання не знайдено", show_alert=True)
         await state.clear()
         return
+    
+    user_ids = get_all_user_ids()
 
-    if not USERS:
+    if len(user_ids) == 0:
         await callback.message.edit_text(
             "⚠️ Завдання створено, але немає учасників для розсилки.\n\n"
             f"🧵 Норма: {norm} хрестиків\n"
@@ -217,7 +207,7 @@ async def task_create_confirm_handler(
     success = 0
     failed = 0
 
-    for user_id in USERS:
+    for user_id in user_ids:
         try:
             await bot.send_message(
                 chat_id=user_id,
@@ -289,20 +279,35 @@ async def users_handler(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    if not USERS:
-        await message.answer(
-            "👥 Учасники\n\n"
-            "Поки що список учасників порожній."
-        )
+    users = get_all_users()
+
+    if not users:
+        await message.answer("👥 Учасники\n\nПоки що учасників немає.")
         return
 
-    text = f"👥 Учасники: {len(USERS)}\n\n"
+    response = "👥 Список учасників:\n\n"
 
-    for index, user_id in enumerate(USERS, start=1):
-        text += f"{index}. ID: {user_id}\n"
+    for index, user in enumerate(users, start=1):
+        tg_id = user["tg_id"]
+        username = user.get("username")
+        full_name = user.get("full_name")
+        crosses_count = user.get("crosses_count", 0)
 
-    await message.answer(text)
+        if username:
+            name = f"@{username}"
+        elif full_name:
+            name = full_name
+        else:
+            name = f"Користувач {tg_id}"
 
+        response += (
+            f"{index}. {name}\n"
+            f"   🆔 ID: {tg_id}\n"
+            f"   👤 Імʼя: {full_name or 'не вказано'}\n"
+            f"   🧵 Хрестиків: {crosses_count}\n\n"
+        )
+
+    await message.answer(response)
 
 @router.message(F.text == "🥇 Рейтинг")
 async def rating_handler(message: Message):
