@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand, BotCommandScopeDefault, MenuButtonCommands
 
-from keyboards import user, admin
+from handlers import admin
+from keyboards import user
 
 load_dotenv()
 
@@ -17,7 +18,6 @@ dp = Dispatcher()
 
 dp.include_router(user.router)
 dp.include_router(admin.router)
-
 
 async def set_bot_commands():
     commands = [
