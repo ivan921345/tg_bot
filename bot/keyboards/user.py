@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
-
+from services.users import add_user, get_user_by_tg_id
 router = Router()
 
 
@@ -18,12 +18,16 @@ user_menu = ReplyKeyboardMarkup(
 )
 
 
-# @router.message(F.text == "/start")
-# async def start_handler(message: Message):
-#     await message.answer(
-#         "🎮 Вітаємо у грі!\n\nОберіть потрібну дію:",
-#         reply_markup=user_menu,
-#     )
+@router.message(F.text == "/start")
+async def start_handler(message: Message):
+
+    if( get_user_by_tg_id(message.from_user.id) == -1):
+        add_user(message.from_user.id, False)
+    
+    await message.answer(
+        "🎮 Вітаємо у грі!\n\nОберіть потрібну дію:",
+        reply_markup=user_menu,
+    )
 
 
 @router.message(F.text == "📋 Завдання")
