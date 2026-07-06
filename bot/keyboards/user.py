@@ -18,12 +18,12 @@ user_menu = ReplyKeyboardMarkup(
 )
 
 
-@router.message(F.text == "/start")
-async def start_handler(message: Message):
-    await message.answer(
-        "🎮 Вітаємо у грі!\n\nОберіть потрібну дію:",
-        reply_markup=user_menu,
-    )
+# @router.message(F.text == "/start")
+# async def start_handler(message: Message):
+#     await message.answer(
+#         "🎮 Вітаємо у грі!\n\nОберіть потрібну дію:",
+#         reply_markup=user_menu,
+#     )
 
 
 @router.message(F.text == "📋 Завдання")

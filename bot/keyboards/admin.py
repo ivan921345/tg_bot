@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
@@ -9,6 +9,8 @@ from aiogram.types import (
 )
 import os
 from dotenv import load_dotenv
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.context import FSMContext
 
 load_dotenv()
 
@@ -16,6 +18,17 @@ router = Router()
 
 ADMIN_IDS_ENV = os.getenv("ADMIN_IDS")
 ADMIN_IDS = ADMIN_IDS_ENV.split(",") if ADMIN_IDS_ENV else []
+
+
+# ВРЕМЕННЫЙ список пользователей для теста
+# Потом лучше заменить на базу данных
+USERS = set()
+
+
+class CreateTask(StatesGroup):
+    waiting_for_norm = State()
+    waiting_for_code_word = State()
+    waiting_for_confirm = State()
 
 
 admin_menu = ReplyKeyboardMarkup(
@@ -32,7 +45,7 @@ admin_menu = ReplyKeyboardMarkup(
 
 
 def is_admin(user_id: int) -> bool:
-    return  str(user_id) in ADMIN_IDS
+    return str(user_id) in ADMIN_IDS
 
 
 def report_check_keyboard(report_id: int):
@@ -52,6 +65,31 @@ def report_check_keyboard(report_id: int):
     )
 
 
+def confirm_task_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Так, створити і розіслати",
+                    callback_data="task_create_confirm",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✏️ Редагувати",
+                    callback_data="task_create_edit",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Скасувати",
+                    callback_data="task_create_cancel",
+                )
+            ],
+        ]
+    )
+
+
 @router.message(F.text == "/admin")
 async def admin_start_handler(message: Message):
     if not is_admin(message.from_user.id):
@@ -64,19 +102,175 @@ async def admin_start_handler(message: Message):
     )
 
 
+# ВРЕМЕННАЯ регистрация пользователя
+# Потом это нужно будет перенести в обычный /start handler и базу данных
+@router.message(F.text == "/start")
+async def start_handler(message: Message):
+    USERS.add(message.from_user.id)
+    print(message.from_user.id)
+
+    await message.answer(
+        "🧵 Вітаю у боті!\n\n"
+        "Ви зареєстровані як учасник гри."
+    )
+
+
 @router.message(F.text == "📝 Створити завдання")
-async def create_task_handler(message: Message):
+async def create_task_handler(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
 
+    await state.clear()
+    await state.set_state(CreateTask.waiting_for_norm)
+
     await message.answer(
         "📝 Створення завдання\n\n"
-        "Поки що це демо.\n\n"
-        "У повній версії тут адмін буде вводити:\n"
-        "1. Норму хрестиків\n"
-        "2. Кодове слово\n"
-        "3. Бот розішле завдання всім учасникам"
+        "Введіть норму хрестиків:\n\n"
+        "Наприклад: 300"
     )
+
+
+@router.message(CreateTask.waiting_for_norm)
+async def get_norm(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        return
+
+    if not message.text.isdigit():
+        await message.answer("❗ Введіть число, наприклад 300")
+        return
+
+    norm = int(message.text)
+
+    if norm <= 0:
+        await message.answer("❗ Норма має бути більше 0.")
+        return
+
+    await state.update_data(norm=norm)
+    await state.set_state(CreateTask.waiting_for_code_word)
+
+    await message.answer(
+        "✅ Норму збережено.\n\n"
+        "Тепер введіть кодове слово:"
+    )
+
+
+@router.message(CreateTask.waiting_for_code_word)
+async def get_code_word(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await state.clear()
+        return
+
+    code_word = message.text.strip()
+
+    if len(code_word) < 2:
+        await message.answer("❗ Кодове слово занадто коротке.")
+        return
+
+    await state.update_data(code_word=code_word)
+
+    data = await state.get_data()
+
+    norm = data["norm"]
+    code_word = data["code_word"]
+
+    await state.set_state(CreateTask.waiting_for_confirm)
+
+    await message.answer(
+        "📋 Перевірте завдання:\n\n"
+        f"🧵 Норма: {norm} хрестиків\n"
+        f"🔑 Кодове слово: {code_word}\n\n"
+        "Створити це завдання і розіслати всім учасникам?",
+        reply_markup=confirm_task_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "task_create_confirm")
+async def task_create_confirm_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Немає доступу", show_alert=True)
+        return
+
+    data = await state.get_data()
+
+    norm = data.get("norm")
+    code_word = data.get("code_word")
+
+    if not norm or not code_word:
+        await callback.answer("Дані завдання не знайдено", show_alert=True)
+        await state.clear()
+        return
+
+    if not USERS:
+        await callback.message.edit_text(
+            "⚠️ Завдання створено, але немає учасників для розсилки.\n\n"
+            f"🧵 Норма: {norm} хрестиків\n"
+            f"🔑 Кодове слово: {code_word}"
+        )
+        await state.clear()
+        return
+
+    success = 0
+    failed = 0
+
+    for user_id in USERS:
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=(
+                    "🧵 Нове завдання!\n\n"
+                    f"✅ Норма: {norm} хрестиків\n"
+                    f"🔑 Кодове слово: {code_word}\n\n"
+                    "Після виконання завдання надішліть звіт."
+                ),
+            )
+            success += 1
+        except Exception:
+            failed += 1
+
+    await callback.message.edit_text(
+        "✅ Завдання створено і розіслано!\n\n"
+        f"🧵 Норма: {norm} хрестиків\n"
+        f"🔑 Кодове слово: {code_word}\n\n"
+        f"👥 Успішно надіслано: {success}\n"
+        f"⚠️ Не вдалося надіслати: {failed}"
+    )
+
+    await state.clear()
+    await callback.answer("Завдання розіслано")
+
+
+@router.callback_query(F.data == "task_create_edit")
+async def task_create_edit_handler(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Немає доступу", show_alert=True)
+        return
+
+    await state.set_state(CreateTask.waiting_for_norm)
+
+    await callback.message.edit_text(
+        "✏️ Редагування завдання\n\n"
+        "Введіть нову норму хрестиків:\n\n"
+        "Наприклад: 300"
+    )
+
+    await callback.answer("Редагування")
+
+
+@router.callback_query(F.data == "task_create_cancel")
+async def task_create_cancel_handler(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Немає доступу", show_alert=True)
+        return
+
+    await state.clear()
+
+    await callback.message.edit_text("❌ Створення завдання скасовано.")
+    await callback.answer("Скасовано")
 
 
 @router.message(F.text == "📥 Звіти на перевірці")
@@ -95,10 +289,19 @@ async def users_handler(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    await message.answer(
-        "👥 Учасники\n\n"
-        "Поки що список учасників порожній."
-    )
+    if not USERS:
+        await message.answer(
+            "👥 Учасники\n\n"
+            "Поки що список учасників порожній."
+        )
+        return
+
+    text = f"👥 Учасники: {len(USERS)}\n\n"
+
+    for index, user_id in enumerate(USERS, start=1):
+        text += f"{index}. ID: {user_id}\n"
+
+    await message.answer(text)
 
 
 @router.message(F.text == "🥇 Рейтинг")
@@ -110,8 +313,6 @@ async def rating_handler(message: Message):
         "🥇 Загальний рейтинг\n\n"
         "Поки що рейтинг порожній."
     )
-
-
 
 
 @router.callback_query(F.data.startswith("approve_report:"))
