@@ -7,10 +7,15 @@ from aiogram.types import (
     InlineKeyboardButton,
     CallbackQuery,
 )
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = Router()
 
-ADMIN_ID = 929000179
+ADMIN_IDS_ENV = os.getenv("ADMIN_IDS")
+ADMIN_IDS = ADMIN_IDS_ENV.split(",") if ADMIN_IDS_ENV else []
 
 
 admin_menu = ReplyKeyboardMarkup(
@@ -21,14 +26,13 @@ admin_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="👥 Учасники"),
             KeyboardButton(text="🥇 Рейтинг"),
         ],
-        [KeyboardButton(text="📢 Розсилка")],
     ],
     resize_keyboard=True,
 )
 
 
 def is_admin(user_id: int) -> bool:
-    return user_id == ADMIN_ID
+    return  str(user_id) in ADMIN_IDS
 
 
 def report_check_keyboard(report_id: int):
@@ -108,16 +112,6 @@ async def rating_handler(message: Message):
     )
 
 
-@router.message(F.text == "📢 Розсилка")
-async def mailing_handler(message: Message):
-    if not is_admin(message.from_user.id):
-        return
-
-    await message.answer(
-        "📢 Розсилка\n\n"
-        "Поки що це демо.\n"
-        "Пізніше тут можна буде надсилати повідомлення всім учасникам."
-    )
 
 
 @router.callback_query(F.data.startswith("approve_report:"))
