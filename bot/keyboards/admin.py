@@ -21,10 +21,6 @@ ADMIN_IDS_ENV = os.getenv("ADMIN_IDS")
 ADMIN_IDS = ADMIN_IDS_ENV.split(",") if ADMIN_IDS_ENV else []
 
 
-# ВРЕМЕННЫЙ список пользователей для теста
-# Потом лучше заменить на базу данных
-USERS = set()
-
 
 class CreateTask(StatesGroup):
     waiting_for_norm = State()
