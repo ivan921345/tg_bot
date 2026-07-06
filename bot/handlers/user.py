@@ -1,9 +1,16 @@
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message,CallbackQuery
+from aiogram.fsm.state import State, StatesGroup
 from services.users import add_user, get_user_by_tg_id
-from keyboards.user import user_menu
+from keyboards.user import user_menu,confirm_report_keyboard
 from services.tasks import get_last_task
+from aiogram.fsm.context import FSMContext
+
 router = Router()
+
+class ReportState(StatesGroup):
+    waiting_first_photo = State()
+    waiting_second_photo = State()
 
 @router.message(F.text == "/start")
 async def start_handler(message: Message):
@@ -30,15 +37,56 @@ async def today_task_handler(message: Message):
 
 
 @router.message(F.text == "📸 Надіслати звіт")
-async def send_report_handler(message: Message):
+async def send_report_handler(message: Message,state: FSMContext):
+    await state.clear()
+    await state.set_state(ReportState.waiting_first_photo)
     await message.answer(
-        "📸 Надсилання звіту\n\n"
-        "Поки що це демо.\n\n"
-        "У повній версії бот попросить:\n"
-        "1. Фото ДО\n"
-        "2. Фото ПІСЛЯ\n"
-        "3. Кількість хрестиків"
+        "📸 Надішліть перше фото ДО з кодовим словом"
     )
+@router.message(ReportState.waiting_first_photo, F.photo)
+async def get_first_photo(message: Message, state: FSMContext):
+    photo = message.photo[-1] 
+    
+    await state.update_data(
+        first_photo=photo.file_id
+    )
+
+    await state.set_state(ReportState.waiting_second_photo)
+
+    await message.answer("Надішліть друге фото ПIСЛЯ з результатом разом з кодовим словом.")
+@router.message(ReportState.waiting_second_photo, F.photo)
+async def get_first_photo(message: Message, state: FSMContext):
+    photo = message.photo[-1] 
+    
+    await state.update_data(
+        second_photo=photo.file_id
+    )
+
+
+    
+    await message.answer(
+        "📋 Пiдвердження звiту\n",
+        reply_markup=confirm_report_keyboard()
+    )
+
+
+@router.callback_query(F.data == "report_confirm")
+async def report_confirm_handler(
+    callback: CallbackQuery,
+    state: FSMContext,
+    bot: Bot,
+):
+    print("1")
+
+@router.callback_query(F.data == "report_edit")
+async def report_edit_handler(callback: CallbackQuery, state: FSMContext):
+   print("2")
+
+
+@router.callback_query(F.data == "report_cancel")
+async def report_cancel_handler(callback: CallbackQuery, state: FSMContext):
+   print("3")
+
 
 
 @router.message(F.text == "🏆 Мій результат")
