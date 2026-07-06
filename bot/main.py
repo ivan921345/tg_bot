@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand, BotCommandScopeDefault, MenuButtonCommands
 
 from handlers import admin
-from keyboards import user
+from handlers import user
 
 load_dotenv()
 
