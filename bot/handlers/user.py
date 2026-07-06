@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 from services.users import add_user, get_user_by_tg_id
 from keyboards.user import user_menu
+from services.tasks import get_last_task
 router = Router()
 
 @router.message(F.text == "/start")
@@ -19,10 +20,11 @@ async def start_handler(message: Message):
 
 @router.message(F.text == "📋 Завдання")
 async def today_task_handler(message: Message):
+    task = get_last_task()
     await message.answer(
         "📋 Завдання на сьогодні\n\n"
-        "🔹 Норма: 500 хрестиків\n"
-        "🔹 Кодове слово: Маяк\n\n"
+        f"🔹 Норма: {task["norm"]} хрестиків\n"
+        f"🔹 Кодове слово: {task["code_word"]}\n\n"
         "Зробіть фото ДО, вишийте норму та надішліть фото ПІСЛЯ."
     )
 

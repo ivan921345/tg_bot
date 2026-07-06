@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 from keyboards.admin import admin_menu, confirm_task_keyboard
 from services.users import get_admin_ids, get_all_user_ids, get_all_users
-
+from services.tasks import add_task
 
 router = Router()
 
@@ -127,6 +127,7 @@ async def task_create_confirm_handler(
         return
 
     user_ids = get_all_user_ids()
+    add_task(code_word, norm)
 
     if len(user_ids) == 0:
         await callback.message.edit_text(
