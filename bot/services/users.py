@@ -57,20 +57,32 @@ def get_user_crosses_count(tg_id:int) -> int:
         return 0
     
 
-def get_user_by_tg_id( tg_id:int) -> int:
+
+def get_user_by_tg_id( tg_id:int):
     response = (
         supabase
         .table("users")
-        .select("tg_id", count="exact")
+        .select("*", count="exact")
         .eq("tg_id", tg_id)
         .execute()
     )
 
     if response.count !=0:
-        return response.data[0]["tg_id"]
+        return response.data[0]
     else:
-        return -1
+        return None
 
+def get_top_users():
+    response = (
+        supabase
+        .table("users")
+        .select("*")
+        .order("crosses_count", desc=True)
+        .limit(10)
+        .execute()
+    )
+
+    return response.data
 
 def get_admin_ids() -> list[int]:
     response = (

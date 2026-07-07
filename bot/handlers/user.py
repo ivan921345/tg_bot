@@ -19,8 +19,8 @@ class ReportState(StatesGroup):
 @router.message(F.text == "/start")
 async def start_handler(message: Message):
     user = message.from_user
-
-    if get_user_by_tg_id(user.id) == -1:
+    
+    if get_user_by_tg_id(user.id) is  None:
         add_user(user.id, user.username, user.full_name)
 
     await message.answer(
