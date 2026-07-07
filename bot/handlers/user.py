@@ -102,7 +102,19 @@ async def report_confirm_handler(
         await state.clear()
         return
 
-    add_report(tg_id,task_id, first_photo, second_photo)
+    task = get_last_task()
+
+    if not task:
+        await callback.answer("Немає активного завдання", show_alert=True)
+        await state.clear()
+        return
+
+    add_report(
+        tg_id=tg_id,
+        task_id=task["id"],
+        first_photo=first_photo,
+        second_photo=second_photo,
+    )
 
     pending_reports_count = get_pending_reports_count()
     admin_ids = get_admin_ids()

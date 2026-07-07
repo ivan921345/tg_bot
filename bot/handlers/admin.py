@@ -1,11 +1,12 @@
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InputMediaPhoto
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-
-from keyboards.admin import admin_menu, confirm_task_keyboard
+from datetime import datetime
+from keyboards.admin import admin_menu, confirm_task_keyboard, report_check_keyboard
 from services.users import get_admin_ids, get_all_user_ids, get_all_users
 from services.tasks import add_task
+from services.reports import get_pending_reports, update_report_status
 
 router = Router()
 
@@ -198,14 +199,92 @@ async def task_create_cancel_handler(callback: CallbackQuery, state: FSMContext)
 
 
 @router.message(F.text == "📥 Звіти на перевірці")
-async def reports_handler(message: Message):
+async def reports_handler(message: Message, bot: Bot):
     if not is_admin(message.from_user.id):
         return
 
+    reports = get_pending_reports()
+
+    if not reports:
+        await message.answer("📭 Немає звітів на перевірці.")
+        return
+
     await message.answer(
-        "📥 Звіти на перевірці\n\n"
-        "Поки що нових звітів немає."
+        f"📥 Неперевірених звітів: {len(reports)}"
     )
+
+    for report in reports:
+        report_id = report["id"]
+
+        user = report["users"]
+        formatted_date = datetime.fromisoformat(report["created_at"]).strftime("%d.%m.%Y %H:%M")
+
+        username = user.get("username")
+        full_name = user.get("full_name")
+
+        username = f"@{username}" if username else "—"
+
+        media = [
+            InputMediaPhoto(
+                media=report["first_photo"],
+                caption=f"📸 Звіт №{report_id}\n\nФото ДО та ПІСЛЯ"
+            ),
+            InputMediaPhoto(
+                media=report["second_photo"],
+            ),
+        ]
+
+        await bot.send_media_group(
+            chat_id=message.chat.id,
+            media=media,
+        )
+
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=(
+                f"📋 <b>Звіт №{report_id}</b>\n\n"
+                f"👤 {full_name}\n"
+                f"🔗 {username}\n"
+                f"📅 {formatted_date}\n\n"
+                f"Статус: ⏳ Очікує перевірки"
+            ),
+            parse_mode="HTML",
+            reply_markup=report_check_keyboard(report_id),
+        )
+
+
+@router.callback_query(F.data.startswith("approve_report:"))
+async def approve_report_handler(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Немає доступу", show_alert=True)
+        return
+
+    report_id = int(callback.data.split(":")[1])
+
+    update_report_status(report_id, "APPROVED")
+
+    await callback.message.edit_text(
+        f"✅ Звіт №{report_id} підтверджено."
+    )
+
+    await callback.answer("Звіт підтверджено")
+
+
+@router.callback_query(F.data.startswith("reject_report:"))
+async def reject_report_handler(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        await callback.answer("Немає доступу", show_alert=True)
+        return
+
+    report_id = int(callback.data.split(":")[1])
+
+    update_report_status(report_id, "REJECTED")
+
+    await callback.message.edit_text(
+        f"❌ Звіт №{report_id} відхилено."
+    )
+
+    await callback.answer("Звіт відхилено")
 
 
 @router.message(F.text == "👥 Учасники")
@@ -253,31 +332,3 @@ async def rating_handler(message: Message):
         "🥇 Загальний рейтинг\n\n"
         "Поки що рейтинг порожній."
     )
-
-
-@router.callback_query(F.data.startswith("approve_report:"))
-async def approve_report_handler(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Немає доступу", show_alert=True)
-        return
-
-    report_id = callback.data.split(":")[1]
-
-    await callback.message.edit_text(
-        f"✅ Звіт №{report_id} підтверджено."
-    )
-    await callback.answer("Звіт підтверджено")
-
-
-@router.callback_query(F.data.startswith("reject_report:"))
-async def reject_report_handler(callback: CallbackQuery):
-    if not is_admin(callback.from_user.id):
-        await callback.answer("Немає доступу", show_alert=True)
-        return
-
-    report_id = callback.data.split(":")[1]
-
-    await callback.message.edit_text(
-        f"❌ Звіт №{report_id} відхилено."
-    )
-    await callback.answer("Звіт відхилено")
