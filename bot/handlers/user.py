@@ -1,7 +1,9 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import Message,CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
-from services.users import add_user, get_user_by_tg_id
+from services.users import add_user, get_user_by_tg_id, get_admin_ids
+from services.reports import add_report,get_pending_reports_count
+
 from keyboards.user import user_menu,confirm_report_keyboard
 from services.tasks import get_last_task
 from aiogram.fsm.context import FSMContext
@@ -46,7 +48,9 @@ async def send_report_handler(message: Message,state: FSMContext):
 @router.message(ReportState.waiting_first_photo, F.photo)
 async def get_first_photo(message: Message, state: FSMContext):
     photo = message.photo[-1] 
-    
+    await state.update_data(
+        tg_id=message.from_user.id
+    )
     await state.update_data(
         first_photo=photo.file_id
     )
@@ -76,7 +80,38 @@ async def report_confirm_handler(
     state: FSMContext,
     bot: Bot,
 ):
-    print("1")
+  
+    data = await state.get_data()
+  
+    tg_id = data.get("tg_id")
+    first_photo = data.get("first_photo")
+    second_photo = data.get("second_photo")
+
+    if not first_photo or not second_photo:
+        await callback.answer("Дані звiту не знайдено", show_alert=True)
+        await state.clear()
+        return
+    admin_ids = get_admin_ids()
+    add_report(tg_id, first_photo, second_photo)
+    await bot.send_message(chat_id=tg_id, text="Звiт надiслано, чекайте на перевiрку.")
+    pending_reports_count = get_pending_reports_count()
+    for admin_id in admin_ids:
+        try:
+            await bot.send_message(
+                chat_id=admin_id,
+                text=(
+                    "📥 Надiслано новий звiт!\n\n"               
+                    f"📋 Неперевiренних звiтiв: {pending_reports_count}\n"
+                ),
+            )
+        except Exception:
+            await callback.answer("Не вдалося вiдправити звiт", show_alert=True)
+
+
+
+
+
+
 
 @router.callback_query(F.data == "report_edit")
 async def report_edit_handler(callback: CallbackQuery, state: FSMContext):

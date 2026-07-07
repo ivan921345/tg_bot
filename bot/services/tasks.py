@@ -21,13 +21,15 @@ def get_last_task():
         .table("tasks")
         .select(
             "code_word",
-            "norm"
+            "norm",
+            count="exact"
         )
+        # TODO: select only todays last task
         .order("created_at", desc=True)
         .limit(1)
         .execute()
     )
-    if len(response.data)!=0:
+    if response.count!=0:
         return response.data[0]
     else:
         return None
