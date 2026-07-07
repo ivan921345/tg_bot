@@ -23,7 +23,7 @@ def get_all_users() -> list[User]:
         supabase
         .table("users")
         .select("id, tg_id, is_admin, crosses_count, username, full_name")
-        .order("crosses_count")
+        .order("crosses_count", desc=True)
         .execute()
     )
 

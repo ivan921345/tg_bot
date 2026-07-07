@@ -293,7 +293,7 @@ async def approve_report_handler(callback: CallbackQuery, bot: Bot):
 
 
 @router.callback_query(F.data.startswith("reject_report:"))
-async def reject_report_handler(callback: CallbackQuery):
+async def reject_report_handler(callback: CallbackQuery, bot: Bot):
     if not is_admin(callback.from_user.id):
         await callback.answer("Немає доступу", show_alert=True)
         return
@@ -301,6 +301,24 @@ async def reject_report_handler(callback: CallbackQuery):
     report_id = int(callback.data.split(":")[1])
 
     update_report_status(report_id, "REJECTED")
+
+    report_data = get_report_by_id(report_id)
+    user_tg_id = report_data["users"]["tg_id"]
+
+    media = [
+        InputMediaPhoto(
+            media=report_data["first_photo"],
+            caption=f"❌ Ваш звіт №{report_id} відхилено."
+        ),
+        InputMediaPhoto(
+            media=report_data["second_photo"],
+        ),
+    ]
+
+    await bot.send_media_group(
+        chat_id=user_tg_id,
+        media=media,
+    )
 
     await callback.message.edit_text(
         f"❌ Звіт №{report_id} відхилено."
@@ -337,7 +355,6 @@ async def users_handler(message: Message):
 
         response += (
             f"{index}. {name}\n"
-            f"   🆔 ID: {tg_id}\n"
             f"   👤 Імʼя: {full_name or 'не вказано'}\n"
             f"   🧵 Хрестиків: {crosses_count}\n\n"
         )
@@ -350,7 +367,72 @@ async def rating_handler(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    await message.answer(
-        "🥇 Загальний рейтинг\n\n"
-        "Поки що рейтинг порожній."
-    )
+    users = get_all_users()
+
+    if not users:
+        await message.answer("🥇 Загальний рейтинг\n\nПоки що рейтинг порожній.")
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    text = "🏆 <b>Загальний рейтинг</b>\n\n"
+
+    for index, user in enumerate(users, start=1):
+        username = user.get("username")
+        full_name = user.get("full_name")
+        tg_id = user.get("tg_id")
+        crosses_count = user.get("crosses_count", 0)
+
+        place = medals[index - 1] if index <= 3 else f"{index}."
+
+        if username:
+            name = f"@{username}"
+        elif full_name:
+            name = full_name
+        else:
+            name = f"Користувач {tg_id}"
+
+        text += (
+            f"{place} <b>{name}</b>\n"
+            f"   👤 Імʼя: {full_name or 'не вказано'}\n"
+            f"   🆔 ID: <code>{tg_id}</code>\n"
+            f"   🧵 Хрестиків: <b>{crosses_count}</b>\n\n"
+        )
+
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(F.text == "🥇 Топ-10")
+async def top_10_handler(message: Message):
+    users = get_all_users()
+
+    if not users:
+        await message.answer("🥇 Топ-10 учасників\n\nПоки що рейтинг порожній.")
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    text = "🏆 <b>Топ-10 учасників</b>\n\n"
+
+    for index, user in enumerate(users, start=1):
+        username = user.get("username")
+        full_name = user.get("full_name")
+        crosses_count = user.get("crosses_count", 0)
+
+        if index <= 3:
+            place = medals[index - 1]
+        else:
+            place = f"{index}."
+
+        if username:
+            name = f"@{username}"
+        elif full_name:
+            name = full_name
+        else:
+            name = "Учасник без імені"
+
+        text += (
+            f"{place} <b>{name}</b>\n"
+            f"   🧵 {crosses_count} хрестиків\n\n"
+        )
+
+    await message.answer(text, parse_mode="HTML")

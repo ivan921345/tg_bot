@@ -10,6 +10,7 @@ admin_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📝 Створити завдання")],
         [KeyboardButton(text="📥 Звіти на перевірці")],
+        [KeyboardButton(text="🥇 Топ-10")],
         [
             KeyboardButton(text="👥 Учасники"),
             KeyboardButton(text="🥇 Рейтинг"),

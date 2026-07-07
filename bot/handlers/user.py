@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from keyboards.user import confirm_report_keyboard, user_menu
 from services.reports import add_report, get_pending_reports_count
 from services.tasks import get_last_task
-from services.users import add_user, get_admin_ids, get_user_by_tg_id,get_user_rating_place
+from services.users import add_user, get_admin_ids, get_user_by_tg_id, get_user_rating_place, get_top_users
 
 router = Router()
 
@@ -171,8 +171,39 @@ async def my_result_handler(message: Message):
 
 @router.message(F.text == "🥇 Топ-10")
 async def top_10_handler(message: Message):
-    await message.answer("🥇 Топ-10 учасників\n\nПоки що рейтинг порожній.")
+    users = get_top_users()
 
+    if not users:
+        await message.answer("🥇 Топ-10 учасників\n\nПоки що рейтинг порожній.")
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    text = "🏆 <b>Топ-10 учасників</b>\n\n"
+
+    for index, user in enumerate(users, start=1):
+        username = user.get("username")
+        full_name = user.get("full_name")
+        crosses_count = user.get("crosses_count", 0)
+
+        if index <= 3:
+            place = medals[index - 1]
+        else:
+            place = f"{index}."
+
+        if username:
+            name = f"@{username}"
+        elif full_name:
+            name = full_name
+        else:
+            name = "Учасник без імені"
+
+        text += (
+            f"{place} <b>{name}</b>\n"
+            f"   🧵 {crosses_count} хрестиків\n\n"
+        )
+
+    await message.answer(text, parse_mode="HTML")
 
 @router.message(F.text == "📖 Правила гри")
 async def rules_handler(message: Message):
