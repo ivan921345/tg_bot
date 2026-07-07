@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message
 from keyboards.user import confirm_report_keyboard, user_menu
 from services.reports import add_report, get_pending_reports_count
 from services.tasks import get_last_task
-from services.users import add_user, get_admin_ids, get_user_by_tg_id
+from services.users import add_user, get_admin_ids, get_user_by_tg_id,get_user_rating_place
 
 router = Router()
 
@@ -160,10 +160,12 @@ async def report_cancel_handler(callback: CallbackQuery, state: FSMContext):
 @router.message(F.text == "🏆 Мій результат")
 async def my_result_handler(message: Message):
     user_data = get_user_by_tg_id(message.from_user.id)
+    user_rating_place = get_user_rating_place(message.from_user.id)
+
     await message.answer(
         "🏆 Ваш результат\n\n"
         f"Всього вишито: {user_data["crosses_count"]} хрестиків\n"
-        "Місце у рейтингу: поки немає"
+        f"Місце у рейтингу: {user_rating_place}"
     )
 
 
