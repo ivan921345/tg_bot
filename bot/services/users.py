@@ -116,3 +116,14 @@ def get_user_rating_place(tg_id:int):
 
     place = (higher_users.count or 0) + 1
     return place
+
+def update_user_crosses_count(id:int, new_crosses_count: int):
+    response = (
+        supabase
+        .table("users")
+        .update({"crosses_count": new_crosses_count})
+        .eq("id", id)
+        .execute()
+    )
+
+    return response.data

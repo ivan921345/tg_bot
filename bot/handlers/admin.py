@@ -4,9 +4,9 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from datetime import datetime
 from keyboards.admin import admin_menu, confirm_task_keyboard, report_check_keyboard
-from services.users import get_admin_ids, get_all_user_ids, get_all_users
+from services.users import get_admin_ids, get_all_user_ids, get_all_users,update_user_crosses_count
 from services.tasks import add_task
-from services.reports import get_pending_reports, update_report_status
+from services.reports import get_pending_reports, update_report_status,get_report_by_id
 
 router = Router()
 
@@ -254,7 +254,7 @@ async def reports_handler(message: Message, bot: Bot):
 
 
 @router.callback_query(F.data.startswith("approve_report:"))
-async def approve_report_handler(callback: CallbackQuery):
+async def approve_report_handler(callback: CallbackQuery, bot: Bot):
     if not is_admin(callback.from_user.id):
         await callback.answer("Немає доступу", show_alert=True)
         return
@@ -262,11 +262,33 @@ async def approve_report_handler(callback: CallbackQuery):
     report_id = int(callback.data.split(":")[1])
 
     update_report_status(report_id, "APPROVED")
+    report_data = get_report_by_id(report_id)
 
+    new_crosses_count=report_data["tasks"]["norm"]+report_data["users"]["crosses_count"]
+    
+    user_id = report_data["users"]["id"]
+    user_tg_id = report_data["users"]["tg_id"]
+
+    
+    update_user_crosses_count(user_id, new_crosses_count)
     await callback.message.edit_text(
         f"✅ Звіт №{report_id} підтверджено."
     )
+    
+    media = [
+        InputMediaPhoto(
+            media=report_data["first_photo"],
+            caption=f"✅ Ваш звіт №{report_id} підтверджено."
+        ),
+        InputMediaPhoto(
+            media=report_data["second_photo"],
+        ),
+    ]   
 
+    await bot.send_media_group(
+        chat_id=user_tg_id,
+        media=media,
+    )
     await callback.answer("Звіт підтверджено")
 
 

@@ -26,7 +26,8 @@ def get_pending_reports():
             users (
                 tg_id,
                 username,
-                full_name
+                full_name,
+                crosses_count
             )
             """
         )
@@ -57,3 +58,17 @@ def get_pending_reports_count():
         .execute()
     )
     return response.count
+def get_report_by_id(report_id:int):
+    response = (
+        supabase
+        .table("reports")
+        .select("""
+            *,
+            users(*),
+            tasks(norm)
+        """)
+        .eq("id", report_id)
+        .single()
+        .execute()
+    )
+    return response.data
