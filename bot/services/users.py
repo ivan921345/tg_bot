@@ -95,3 +95,24 @@ def get_admin_ids() -> list[int]:
 
     
     return [row["tg_id"] for row in response.data]
+
+def get_user_rating_place(tg_id:int):
+    user = (
+        supabase
+        .table("users")
+        .select("crosses_count")
+        .eq("tg_id", tg_id)
+        .single()
+        .execute()
+    )
+    crosses_count = user.data["crosses_count"]
+    higher_users = (
+        supabase
+        .table("users")
+        .select("*", count="exact", head=True)
+        .gt("crosses_count", crosses_count)
+        .execute()
+    )
+
+    place = (higher_users.count or 0) + 1
+    return place
