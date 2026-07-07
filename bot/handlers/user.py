@@ -19,7 +19,7 @@ class ReportState(StatesGroup):
 @router.message(F.text == "/start")
 async def start_handler(message: Message):
     user = message.from_user
-    
+
     if get_user_by_tg_id(user.id) is  None:
         add_user(user.id, user.username, user.full_name)
 
@@ -144,9 +144,10 @@ async def report_cancel_handler(callback: CallbackQuery, state: FSMContext):
 
 @router.message(F.text == "🏆 Мій результат")
 async def my_result_handler(message: Message):
+    user_data = get_user_by_tg_id(message.from_user.id)
     await message.answer(
         "🏆 Ваш результат\n\n"
-        "Всього вишито: 0 хрестиків\n"
+        f"Всього вишито: {user_data["crosses_count"]} хрестиків\n"
         "Місце у рейтингу: поки немає"
     )
 
