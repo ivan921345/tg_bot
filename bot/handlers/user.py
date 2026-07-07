@@ -56,10 +56,11 @@ async def send_report_handler(message: Message, state: FSMContext):
 @router.message(ReportState.waiting_first_photo, F.photo)
 async def get_first_photo(message: Message, state: FSMContext):
     photo = message.photo[-1]
-
+    current_task = get_last_task()
     await state.update_data(
         tg_id=message.from_user.id,
         first_photo=photo.file_id,
+        task_id=current_task["id"]
     )
 
     await state.set_state(ReportState.waiting_second_photo)
@@ -93,13 +94,15 @@ async def report_confirm_handler(
     tg_id = data.get("tg_id")
     first_photo = data.get("first_photo")
     second_photo = data.get("second_photo")
+    task_id = data.get("task_id")
+
 
     if not tg_id or not first_photo or not second_photo:
         await callback.answer("Дані звіту не знайдено", show_alert=True)
         await state.clear()
         return
 
-    add_report(tg_id, first_photo, second_photo)
+    add_report(tg_id,task_id, first_photo, second_photo)
 
     pending_reports_count = get_pending_reports_count()
     admin_ids = get_admin_ids()

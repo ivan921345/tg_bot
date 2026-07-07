@@ -1,4 +1,5 @@
 from db import supabase
+from datetime import datetime, timezone
 
 def add_task(code_word: str,norm: int):
     response = (
@@ -19,12 +20,7 @@ def get_last_task():
     response = (
         supabase
         .table("tasks")
-        .select(
-            "code_word",
-            "norm",
-            count="exact"
-        )
-        # TODO: select only todays last task
+        .select("*")
         .order("created_at", desc=True)
         .limit(1)
         .execute()
